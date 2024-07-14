@@ -13,17 +13,18 @@ contract MarketplaceEscrow {
 
     address public arbiter;
     mapping(string => Item) public items;
+    string[] private itemNames; // Changed visibility to private
 
     enum State { AWAITING_PAYMENT, AWAITING_CONFIRMATION, COMPLETE, DISPUTE }
     mapping(string => State) public itemState;
 
     modifier onlyBuyer(string memory itemName) {
-        require(msg.sender == items[itemName].buyer, "Only buyer can call this method");
+        require(msg.sender == items[itemName].buyer, "Only buyer can call");
         _;
     }
 
     modifier onlySeller(string memory itemName) {
-        require(msg.sender == items[itemName].seller, "Only seller can call this method");
+        require(msg.sender == items[itemName].seller, "Only seller can call");
         _;
     }
 
@@ -41,6 +42,8 @@ contract MarketplaceEscrow {
         arbiter = _arbiter;
     }
 
+    // Seller Methods
+
     function listItem(string memory itemName, uint itemPrice) external {
         require(items[itemName].seller == address(0), "Item already listed");
         items[itemName] = Item({
@@ -52,7 +55,16 @@ contract MarketplaceEscrow {
             fundsReleased: false
         });
         itemState[itemName] = State.AWAITING_PAYMENT;
+        itemNames.push(itemName); // Update itemNames array
     }
+
+    function cancelListing(string memory itemName) external onlySeller(itemName) inState(itemName, State.AWAITING_PAYMENT) {
+        delete items[itemName];
+        itemState[itemName] = State.COMPLETE;
+        removeItemName(itemName); // Remove item name from itemNames array
+    }
+
+    // Buyer Methods
 
     function buyItem(string memory itemName) external payable inState(itemName, State.AWAITING_PAYMENT) {
         Item storage item = items[itemName];
@@ -73,6 +85,8 @@ contract MarketplaceEscrow {
         itemState[itemName] = State.DISPUTE;
     }
 
+    // Arbiter Methods
+
     function resolveDispute(string memory itemName, bool releaseFundsToSeller) external onlyArbiter inState(itemName, State.DISPUTE) {
         Item storage item = items[itemName];
         if (releaseFundsToSeller) {
@@ -83,8 +97,22 @@ contract MarketplaceEscrow {
         itemState[itemName] = State.COMPLETE;
     }
 
-    function cancelListing(string memory itemName) external onlySeller(itemName) inState(itemName, State.AWAITING_PAYMENT) {
-        delete items[itemName];
-        itemState[itemName] = State.COMPLETE;
+    // Getter Methods
+
+    function getItemNames() external view returns (string[] memory) {
+        return itemNames;
+    }
+
+    // Internal function to remove item name from array
+    function removeItemName(string memory itemName) private {
+        for (uint i = 0; i < itemNames.length; i++) {
+            if (keccak256(bytes(itemNames[i])) == keccak256(bytes(itemName))) {
+                if (i != itemNames.length - 1) {
+                    itemNames[i] = itemNames[itemNames.length - 1];
+                }
+                itemNames.pop();
+                break;
+            }
+        }
     }
 }

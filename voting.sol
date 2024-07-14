@@ -9,11 +9,11 @@ contract DecentralizedVoting {
 
     struct Voter {
         VoterStatus status;
-        uint vote; 
+        uint vote; // Option they voted for
     }
 
     mapping(address => Voter) public voters;
-    mapping(uint => uint) public votesCount; 
+    mapping(uint => uint) public votesCount; // Option to vote count mapping
 
     modifier onlyBeforeRegistrationDeadline() {
         require(block.timestamp < registrationDeadline, "Registration period is over");
@@ -45,16 +45,15 @@ contract DecentralizedVoting {
 
     function castVote(uint option) external onlyRegistered {
         Voter storage voter = voters[msg.sender];
-        require(voter.status == VoterStatus.REGISTERED, "You have already voted or are blacklisted");
 
-        if (voter.status == VoterStatus.REGISTERED) {
+        if (voter.status == VoterStatus.VOTED) {
+            // If voter tries to vote again
+            votesCount[voter.vote]--; // Remove previous vote
+            voter.status = VoterStatus.BLACKLISTED; // Blacklist the voter
+        } else {
             voter.status = VoterStatus.VOTED;
             voter.vote = option;
             votesCount[option]++;
-        } else if (voter.status == VoterStatus.VOTED) {
-            // If try to vote again
-            votesCount[voter.vote]--; // Remove previous vote
-            voter.status = VoterStatus.BLACKLISTED; // Blacklist the voter
         }
     }
 
